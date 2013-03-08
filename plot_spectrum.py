@@ -33,7 +33,7 @@ def interpolate_with_error(x, y, dy, x_new, fill_value=np.nan):
 
 
 class SpecAggregator(object):
-    def __init__(self, coeff0=3.5, coeff1=1E-4, N=5E3):
+    def __init__(self, coeff0=3.5, coeff1=1E-4, N=4E3):
         self.lam = 10 ** (coeff0 + coeff1 * np.arange(N))
         self.count = np.zeros(N, dtype=int)
         self.numerator = np.zeros(N, dtype=int)
@@ -47,18 +47,32 @@ class SpecAggregator(object):
         dspec[dspec == 0] = np.inf
         w = 1. / dspec / dspec
 
-        norm = np.dot(spec, w) / np.sum(w)
-
         lam = spectrum.restframe().wavelength()
         spec_I, dspec_I = interpolate_with_error(lam,
-                                                 spec / norm,
-                                                 dspec / norm,
+                                                 spec,
+                                                 dspec,
                                                  self.lam)
         w = 1. / (dspec_I ** 2)
 
+        # compute norm by matching new spectrum to current mean,
+        # making use of errors
+        if np.sum(self.count) == 0:
+            norm = np.dot(spec_I, w) / np.sum(w)
+        else:
+            mu = self.numerator / self.denominator
+            dmu2 = self.count / (self.denominator ** 2)
+            
+            mu[self.count == 0] = 0
+            dmu2[self.count == 0] = np.inf
+            sig2 = dmu2 + dspec_I ** 2
+
+            num = spec_I * spec_I / sig2
+            denom = spec_I * mu / sig2
+            norm = num.sum() / denom.sum()
+
         self.count += (w > 0)
-        self.numerator += spec_I * w
-        self.denominator += w
+        self.numerator += norm * spec_I * w
+        self.denominator += norm * norm * w
 
     def reduce(self):
         return (self.numerator / self.denominator,
