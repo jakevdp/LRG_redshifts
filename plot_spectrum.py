@@ -8,6 +8,22 @@ from astroML.datasets.tools import query_plate_mjd_fiber, TARGET_GALAXY_RED
 
 
 def interpolate_with_error(x, y, dy, x_new, fill_value=np.nan):
+    """Linear Interpolation, keeping track of error propagation
+
+    Parameters
+    ----------
+    x, y, dy : arrays
+        locations, values, and errors of input points
+    x_new : array
+        locations of points to be interpolated
+    fill_value : array
+        value to use outside the domain of x
+
+    Returns
+    -------
+    y_new, dy_new : arrays
+        values and errors at the interpolated locations
+    """
     out_of_bounds = (x_new < x[0]) | (x_new > x[-1])
     i_x_new = np.searchsorted(x, x_new)
     i_x_new = i_x_new.clip(1, len(x) - 1).astype(int)
@@ -41,8 +57,6 @@ class SpecAggregator(object):
 
     def add_spec(self, spectrum):
         spec = spectrum.hdulist[0].data[0]
-        dspec = np.ones_like(spec)
-
         dspec = spectrum.hdulist[0].data[2]
         dspec[dspec == 0] = np.inf
         w = 1. / dspec / dspec
@@ -55,7 +69,7 @@ class SpecAggregator(object):
         w = 1. / (dspec_I ** 2)
 
         # compute norm by matching new spectrum to current mean,
-        # making use of errors
+        # accounting for measurement errors
         if np.sum(self.count) == 0:
             norm = np.dot(spec_I, w) / np.sum(w)
         else:
