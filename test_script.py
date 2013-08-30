@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,31 +10,38 @@ from specanalysis import SpecMeanAggregator
 
 
 primtarget=TARGET_GALAXY_RED
-zlim=(0.42, 0.55)
+zlim=(0.2, 0.6)
 
-plate, mjd, fiber = query_plate_mjd_fiber(20, primtarget, zlim[0], zlim[1])
+plate, mjd, fiber = query_plate_mjd_fiber(100, primtarget, zlim[0], zlim[1])
 
 agg = SpecMeanAggregator()
 lam = agg.lam
 
+zdist = []
+
 for plate_n, mjd_n, fiber_n in zip(plate, mjd, fiber):
+    sys.stdout.write("{0}.{1}.{2}         \r".format(plate_n, mjd_n, fiber_n))
+    sys.stdout.flush()
     spec = fetch_sdss_spectrum(plate_n, mjd_n, fiber_n)
-                 
-    print spec.z
+    zdist.append(spec.z)
     agg.add_spec(spec)
 
-    specI, dspecI = agg.regrid_spec(spec)
-    plt.plot(lam, specI)
+sys.stdout.write('\n')
     
 spec, dspec = agg.reduce()
 
-plt.plot(lam, spec, '-k')
-#plt.plot(lam, dspec, '-b')
+fig, ax = plt.subplots(2, 1, figsize=(8, 8))
+ax[0].plot(lam, spec, '-k')
+#ax[0].fill_between(lam, spec - dspec, spec + dspec,
+#                   color='#AAAAAA', alpha=0.3)
 
-plt.fill_between(lam, spec - dspec, spec + dspec,
-                 color='#AAAAAA', alpha=0.3)
+ax[0].set_xlim(2500, 7500)
+ax[0].set_ylim(0, 0.7)
+ax[0].set_xlabel(r'$\lambda')
+ax[0].set_ylabel('normalized flux')
 
-plt.xlim(3000, 6500)
-plt.ylim(0, 10)
+ax[1].hist(agg.redshifts, bins=20, histtype='stepfilled', alpha=0.3)
+ax[1].set_xlabel('z')
+ax[1].set_ylabel('N(z)')
 
 plt.show()
